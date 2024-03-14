@@ -110,30 +110,30 @@ class VideoTransform:
         return self.video_pipeline(sample)
 
 
-class AudioTransform:
-    def __init__(self, subset, snr_target=None):
-        if subset == "train":
-            self.audio_pipeline = torch.nn.Sequential(
-                AdaptiveTimeMask(6400, 16000),
-                AddNoise(),
-                FunctionalModule(
-                    lambda x: torch.nn.functional.layer_norm(x, x.shape, eps=1e-8)
-                ),
-            )
-        elif subset == "val" or subset == "test":
-            self.audio_pipeline = torch.nn.Sequential(
-                AddNoise(snr_target=snr_target)
-                if snr_target is not None
-                else FunctionalModule(lambda x: x),
-                FunctionalModule(
-                    lambda x: torch.nn.functional.layer_norm(x, x.shape, eps=1e-8)
-                ),
-            )
+# class AudioTransform:
+#     def __init__(self, subset, snr_target=None):
+#         if subset == "train":
+#             self.audio_pipeline = torch.nn.Sequential(
+#                 AdaptiveTimeMask(6400, 16000),
+#                 AddNoise(),
+#                 FunctionalModule(
+#                     lambda x: torch.nn.functional.layer_norm(x, x.shape, eps=1e-8)
+#                 ),
+#             )
+#         elif subset == "val" or subset == "test":
+#             self.audio_pipeline = torch.nn.Sequential(
+#                 AddNoise(snr_target=snr_target)
+#                 if snr_target is not None
+#                 else FunctionalModule(lambda x: x),
+#                 FunctionalModule(
+#                     lambda x: torch.nn.functional.layer_norm(x, x.shape, eps=1e-8)
+#                 ),
+#             )
 
-    def __call__(self, sample):
-        # sample: T x 1
-        # rtype: T x 1
-        return self.audio_pipeline(sample)
+#     def __call__(self, sample):
+#         # sample: T x 1
+#         # rtype: T x 1
+#         return self.audio_pipeline(sample)
 
 
 class TextTransform:

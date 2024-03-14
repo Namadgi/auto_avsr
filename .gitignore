@@ -6,4 +6,7 @@ outputs/
 .idea/
 *.pyc
 *.tar
+*.pth
 .DS_Store
+model_weights/
+demo/
