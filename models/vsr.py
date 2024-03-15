@@ -1,20 +1,21 @@
 import os
 import torch
 import torchvision
-from datamodule.transforms import VideoTransform
-from preparation.detectors.retinaface.detector import LandmarksDetector
-from preparation.detectors.retinaface.video_process import VideoProcess
-from lightning import ModelModule
 
-class InferencePipeline(torch.nn.Module):
+from data_transforms import VideoTransform
+from retina_detector import LandmarksDetector
+from retina_video_process import VideoProcess
+
+from model_module import ModelModule
+
+class VSR(torch.nn.Module):
     def __init__(self):
-        super(InferencePipeline, self).__init__()
+        super(VSR, self).__init__()
         
         self.landmarks_detector = LandmarksDetector(device="cuda")
         self.video_process = VideoProcess(convert_gray=False)
         self.video_transform = VideoTransform(subset="test")
-
-        self.modelmodule = ModelModule(cfg)
+        self.modelmodule = ModelModule()
 
 
     def forward(self, data_filename):
@@ -34,3 +35,12 @@ class InferencePipeline(torch.nn.Module):
 
     def load_video(self, data_filename):
         return torchvision.io.read_video(data_filename, pts_unit="sec")[0].numpy()
+
+
+if __name__ == "__main__":
+    pipeline = VSR()
+    pipeline.load_state_dict(torch.load('../model_weights/vsr_pipe.pth'))
+    pipeline = pipeline.to('cuda')
+    pipeline.eval()
+    transcript = pipeline('../data/one_ten.MOV')
+    print(f"transcript: {transcript}")
