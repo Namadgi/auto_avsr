@@ -9,4 +9,6 @@ outputs/
 *.pth
 .DS_Store
 model_weights/
-demo/
+data/
+*.MOV
+*.avi
