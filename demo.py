@@ -23,7 +23,7 @@ class InferencePipeline(torch.nn.Module):
             if detector == "retinaface":
                 from preparation.detectors.retinaface.detector import LandmarksDetector
                 from preparation.detectors.retinaface.video_process import VideoProcess
-                self.landmarks_detector = LandmarksDetector(device="cpu")
+                self.landmarks_detector = LandmarksDetector(device="cuda")
                 self.video_process = VideoProcess(convert_gray=False)
             self.video_transform = VideoTransform(subset="test")
 
@@ -95,9 +95,9 @@ class InferencePipeline(torch.nn.Module):
 @hydra.main(version_base="1.3", config_path="configs", config_name="config")
 def main(cfg):
     pipeline = InferencePipeline(cfg)
-    torch.save(pipeline.state_dict(), 'model_weights/vsr.pth')
-    # transcript = pipeline(cfg.file_path)
-    # print(f"transcript: {transcript}")
+    torch.save(pipeline.state_dict(), 'model_weights/vsr_pipe.pth')
+    transcript = pipeline(cfg.file_path)
+    print(f"transcript: {transcript}")
 
 
 if __name__ == "__main__":

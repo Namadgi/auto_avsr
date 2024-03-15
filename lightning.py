@@ -1,9 +1,11 @@
 import torch
 import torchaudio
+from torch import nn
+
 from cosine import WarmupCosineScheduler
 from datamodule.transforms import TextTransform
 
-from pytorch_lightning import LightningModule
+# from pytorch_lightning import LightningModule
 from espnet.nets.batch_beam_search import BatchBeamSearch
 from espnet.nets.pytorch_backend.e2e_asr_conformer import E2E
 from espnet.nets.scorers.length_bonus import LengthBonus
@@ -14,11 +16,12 @@ def compute_word_level_distance(seq1, seq2):
     return torchaudio.functional.edit_distance(seq1.lower().split(), seq2.lower().split())
 
 
-class ModelModule(LightningModule):
+class ModelModule(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        self.save_hyperparameters(cfg)
+        # self.save_hyperparameters(cfg)
         self.cfg = cfg
+        self.device = 'cuda'
         # if self.cfg.data.modality == "audio":
         #     self.backbone_args = self.cfg.model.audio_backbone
         if self.cfg.data.modality == "video":
@@ -30,7 +33,7 @@ class ModelModule(LightningModule):
 
         # -- initialise
         if self.cfg.pretrained_model_path:
-            ckpt = torch.load(self.cfg.pretrained_model_path, map_location=lambda storage, loc: storage)
+            ckpt = torch.load(self.cfg.pretrained_model_path, map_location='cuda')
             # if self.cfg.transfer_frontend:
             #     tmp_ckpt = {k: v for k, v in ckpt["model_state_dict"].items() if k.startswith("trunk.") or k.startswith("frontend3D.")}
             #     self.model.encoder.frontend.load_state_dict(tmp_ckpt)
@@ -39,6 +42,7 @@ class ModelModule(LightningModule):
             #     self.model.encoder.load_state_dict(tmp_ckpt, strict=True)
             # else:
             self.model.load_state_dict(ckpt)
+        self.model.to(self.device)
 
     # def configure_optimizers(self):
     #     optimizer = torch.optim.AdamW([{"name": "model", "params": self.model.parameters(), "lr": self.cfg.optimizer.lr}], weight_decay=self.cfg.optimizer.weight_decay, betas=(0.9, 0.98))
