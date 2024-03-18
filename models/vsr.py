@@ -1,7 +1,8 @@
 import os
 import torch
 import torchvision
-
+import cv2
+import numpy as np
 from data_transforms import VideoTransform
 from retina_detector import LandmarksDetector
 from retina_video_process import VideoProcess
@@ -19,28 +20,54 @@ class VSR(torch.nn.Module):
 
 
     def forward(self, data_filename):
+        print('get path')
         data_filename = os.path.abspath(data_filename)
-
+        print('load video')
         video = self.load_video(data_filename)
+        print('Load successfull')
         landmarks = self.landmarks_detector(video)
+        print('Landmark successfull')
         video = self.video_process(video, landmarks)
+        print('Process successfull')
+        if video is None:
+            return ''
+        # print(video, type(video))
         video = torch.tensor(video)
+        print('Tensor successfull')
         video = video.permute((0, 3, 1, 2))
+        print('Permute successfull')
         video = self.video_transform(video)
-
+        print('We are here')
         with torch.no_grad():
             transcript = self.modelmodule(video)
 
         return transcript
 
     def load_video(self, data_filename):
-        return torchvision.io.read_video(data_filename, pts_unit="sec")[0].numpy()
+        # cap = cv2.VideoCapture(data_filename)
+        # length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # images = []
+        # success, image = cap.read()
+        # # count = 0
+        # while success:
+        #     # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        #     images.append(image)
+        #     #   cv2.imwrite("frame%d.jpg" % count, image)     # save frame as JPEG file      
+        #     success, image = cap.read()
+        #     # print('Read a new frame: ', success)
+        #     # count += 1
+        # images_np = torch.from_numpy(np.array(images)[:, :, :, ::-1].copy())
+        # return images_np
 
 
-if __name__ == "__main__":
-    pipeline = VSR()
-    pipeline.load_state_dict(torch.load('../model_weights/vsr_pipe.pth'))
-    pipeline = pipeline.to('cuda')
-    pipeline.eval()
-    transcript = pipeline('../data/one_ten.MOV')
-    print(f"transcript: {transcript}")
+        return torchvision.io.read_video(data_filename, end_pts=10, pts_unit="sec")[0].numpy()
+
+
+# if __name__ == "__main__":
+#     pipeline = VSR()
+#     pipeline.load_state_dict(torch.load('../model_weights/vsr.pth'))
+#     pipeline = pipeline.to('cuda')
+#     pipeline.eval()
+#     transcript = pipeline('../data/one_ten.MOV')
+#     print(f"transcript: {transcript}")

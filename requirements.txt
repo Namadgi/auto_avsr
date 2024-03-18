@@ -1,4 +1,7 @@
-hydra-core
+torch>=1.6.0
+torchaudio>=0.6.0
+torchvision
+numpy
 sentencepiece
 scikit-image
 av
