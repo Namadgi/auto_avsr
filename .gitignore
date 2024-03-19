@@ -16,3 +16,6 @@ models/retina_mean.npy
 models/unigram5000.model
 models/unigram5000_units.txt
 model_store/
+*.json
+face_detection/
+face_alignment/
