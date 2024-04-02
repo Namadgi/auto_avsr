@@ -3,6 +3,7 @@ import torch
 import torchvision
 import cv2
 import numpy as np
+import time
 from data_transforms import VideoTransform
 from retina_detector import LandmarksDetector
 from retina_video_process import VideoProcess
@@ -20,27 +21,28 @@ class VSR(torch.nn.Module):
 
 
     def forward(self, data_filename):
-        print('get path')
         data_filename = os.path.abspath(data_filename)
-        print('load video')
+        cur_time = time.time()
         video = self.load_video(data_filename)
-        print('Load successfull')
+        print('IP: ', time.time() - cur_time)
+        cur_time = time.time()
         landmarks = self.landmarks_detector(video)
-        print('Landmark successfull')
+        print('FD: ', time.time() - cur_time)
+        cur_time = time.time()
         video = self.video_process(video, landmarks)
-        print('Process successfull')
+        print('FC: ', time.time() - cur_time)
         if video is None:
             return ''
         # print(video, type(video))
         video = torch.tensor(video)
-        print('Tensor successfull')
         video = video.permute((0, 3, 1, 2))
-        print('Permute successfull')
+        cur_time = time.time()
         video = self.video_transform(video)
-        print('We are here')
+        print('VE: ', time.time() - cur_time)
+        cur_time = time.time()
         with torch.no_grad():
             transcript = self.modelmodule(video)
-
+        print('VI: ', time.time() - cur_time)
         return transcript
 
     def load_video(self, data_filename):

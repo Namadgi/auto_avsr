@@ -6,10 +6,12 @@ import torch
 from ts.torch_handler.base_handler import BaseHandler
 
 import subprocess
+import time
 
 SCALE = 0.25
 VIDEO_TEMP   = 'temp.avi'
 VIDEO_OUTPUT = 'output.mp4'
+VIDEO_FACE_D = 'output.avi'
 # AUDIO_OUTPUT = 'output.wav'
 
 class VSRHandler(BaseHandler):
@@ -57,15 +59,17 @@ class VSRHandler(BaseHandler):
             )
 
         subprocess.call(
-            f'ffmpeg -y -i {object_name} -r 24 {VIDEO_OUTPUT}',
+            f'ffmpeg -y -i {object_name} -qscale:v 2 -threads 10 ' +\
+            f'-async 1 -r 25 -vf scale="-2:640" {VIDEO_OUTPUT} -loglevel panic',
+            # f'ffmpeg -y -i {object_name} -r 24 {VIDEO_OUTPUT}',
             shell=True, 
             stdout=None,    
         )
 
         # subprocess.call(
-        #     f'ffmpeg -i {VIDEO_TEMP} -vcodec libx265 -crf 28 {VIDEO_OUTPUT}',
-        #     shell=True, 
-        #     stdout=None,
+        #     f'ffmpeg -y -i {VIDEO_OUTPUT} -vf scale="-2:640" {VIDEO_FACE_D}',
+        #     shell=True,
+        #     stdout=None
         # )
 
         return VIDEO_OUTPUT
@@ -78,9 +82,7 @@ class VSRHandler(BaseHandler):
         """
         # Do some inference call to engine here and return output
         self.model.eval()
-        print('Eval')
         with torch.no_grad():
-            print('sending')
             y = self.model(file)
         return y
 
@@ -111,6 +113,8 @@ class VSRHandler(BaseHandler):
         :param context: Initial context contains model server system properties.
         :return: prediction output
         """
+        cur_time = time.time()
         file = self.preprocess(data)
+        print('VP: ', time.time() - cur_time)
         text = self.inference(file)
         return self.postprocess(text)

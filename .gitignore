@@ -19,3 +19,6 @@ model_store/
 *.json
 face_detection/
 face_alignment/
+test.py
+check_sum.py
+setup.ipynb

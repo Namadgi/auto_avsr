@@ -3,7 +3,7 @@
 
 # Copyright 2021 Imperial College London (Pingchuan Ma)
 # Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
-
+import time
 import warnings
 
 from ibug.face_alignment import FANPredictor
@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 
 
 class LandmarksDetector:
-    def __init__(self, device="cuda:0", model_name="resnet50"):
+    def __init__(self, device="cuda:0", model_name="mobilenet0.25"):
         self.face_detector = RetinaFacePredictor(
             device=device,
             threshold=0.8,
@@ -21,10 +21,18 @@ class LandmarksDetector:
         )
         self.landmark_detector = FANPredictor(device=device, model=None)
 
-    def __call__(self, video_frames):
+    def __call__(self, video_frames, skip_step=2):
         landmarks = []
-        for frame in video_frames:
+        fd_time_total = 0
+        ld_time_total = 0
+        for i, frame in enumerate(video_frames):
+            if i != len(video_frames) - 1 and i % skip_step != 0:
+                landmarks.append(None)
+                continue
+            cur_time = time.time()     
             detected_faces = self.face_detector(frame, rgb=False)
+            fd_time_total += time.time() - cur_time
+            cur_time = time.time()
             face_points, _ = self.landmark_detector(frame, detected_faces, rgb=True)
             if len(detected_faces) == 0:
                 landmarks.append(None)
@@ -35,4 +43,8 @@ class LandmarksDetector:
                     if bbox_size > max_size:
                         max_id, max_size = idx, bbox_size
                 landmarks.append(face_points[max_id])
+            ld_time_total += time.time() - cur_time
+        print('FD:', fd_time_total)
+        print('LD:', ld_time_total)
+
         return landmarks
