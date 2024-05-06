@@ -79,7 +79,7 @@ RUN pip install pyyaml
 RUN apt-get -y update
 RUN apt-get -y upgrade
 RUN apt-get install -y ffmpeg
-
+RUN pip install strsimpy
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY config.properties /home/model-server/config.properties

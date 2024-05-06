@@ -7,6 +7,7 @@ from ts.torch_handler.base_handler import BaseHandler
 
 import subprocess
 import time
+import strsimpy
 
 SCALE = 0.25
 VIDEO_TEMP   = 'temp.avi'
@@ -15,7 +16,8 @@ VIDEO_FACE_D = 'output.avi'
 # AUDIO_OUTPUT = 'output.wav'
 
 class VSRHandler(BaseHandler):
-
+    NLEV_THRESHOLD = 0.5
+    
     def preprocess(self, data):
         """
         Transform raw input into model input data.
@@ -46,12 +48,13 @@ class VSRHandler(BaseHandler):
                 with open(VIDEO_TEMP, 'wb') as out_file:
                     out_file.write(data)
                     object_name = VIDEO_TEMP
-
+        phrase = ''
         if is_dict:
             # Download file
             token = data['token']
             bucket_name = data['bucket_name']
             object_name = data['object_name']
+            phrase = data['phrase']
             os.system(
                 f'curl -X GET ' +
                 f'-H "Authorization: Bearer {token}" -o {object_name} '
@@ -72,7 +75,7 @@ class VSRHandler(BaseHandler):
         #     stdout=None
         # )
 
-        return VIDEO_OUTPUT
+        return VIDEO_OUTPUT, phrase
 
     def inference(self, file):
         """
@@ -86,23 +89,28 @@ class VSRHandler(BaseHandler):
             y = self.model(file)
         return y
 
-    def postprocess(self, text):
+    def postprocess(self, pred_text, target_text):
         """
         Return inference result.
         :param inference_output: list of inference output
         :return: list of predict results
         """
-        code = 0
-        description = 'Successful check'
-        
-        if text == '':
-            code = 1
-            description = 'No face present'
+
+        descriptions = [
+            'Successful check',
+            'Phrase does not match',
+            'No face present',
+        ]
+
+        if pred_text == '':
+            code = 2
+        else:
+            code = int(self.compare_texts(pred_text, target_text))
             
         return [{
             'code': code,
-            'description': description,
-            'result': text,
+            'description': descriptions[code],
+            'result': pred_text,
         }]
 
     def handle(self, data, context):
@@ -114,7 +122,15 @@ class VSRHandler(BaseHandler):
         :return: prediction output
         """
         cur_time = time.time()
-        file = self.preprocess(data)
+        file, phrase = self.preprocess(data)
         print('VP: ', time.time() - cur_time)
         text = self.inference(file)
-        return self.postprocess(text)
+        return self.postprocess(text, phrase)
+
+    def compare_texts(self, pred_text: str, target_text: str):
+        pred_text   = pred_text  .strip().upper()
+        target_text = target_text.strip().upper()
+        nlev = strsimpy.NormalizedLevenshtein()
+        nlev_similarity_score = nlev.similarity(pred_text, target_text)
+        return nlev_similarity_score < self.NLEV_THRESHOLD
+            

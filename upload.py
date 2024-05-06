@@ -29,7 +29,7 @@ from google.cloud import aiplatform
 #     # experiment_description='my experiment description'
 # )
 
-VERSION = 1
+VERSION = '3-dev'
 APP_NAME = 'vsr'
 CUSTOM_PREDICTOR_IMAGE_URI = 'us-central1-docker.pkg.dev/biometry-416410/biometry-docker-repo/vsr:latest'
 
@@ -55,7 +55,7 @@ model.wait()
 # print(model.display_name)
 # print(model.resource_name)
 
-endpoint_display_name = f"{APP_NAME}-endpoint"
+endpoint_display_name = f"{APP_NAME}-dev-endpoint"
 endpoint = aiplatform.Endpoint.create(display_name=endpoint_display_name)
 
 # aiplatform.Model.
