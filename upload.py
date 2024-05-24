@@ -36,7 +36,7 @@ CUSTOM_PREDICTOR_IMAGE_URI = 'us-central1-docker.pkg.dev/biometry-416410/biometr
 model_display_name = f"{APP_NAME}-v{VERSION}"
 model_description = "PyTorch based video classification with custom container"
 MODEL_NAME = 'vsr'
-health_route = "/ping"
+health_route = "/ping" 
 predict_route = f"/predictions/{MODEL_NAME}"
 serving_container_ports = [8080]
 
@@ -55,8 +55,8 @@ model.wait()
 # print(model.display_name)
 # print(model.resource_name)
 
-endpoint_display_name = f"{APP_NAME}-dev-endpoint"
-endpoint = aiplatform.Endpoint.create(display_name=endpoint_display_name)
+# endpoint_display_name = f"{APP_NAME}-dev-endpoint"
+# endpoint = aiplatform.Endpoint.create(display_name=endpoint_display_name)
 
 # aiplatform.Model.
 

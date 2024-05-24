@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import json
 
@@ -10,10 +11,8 @@ import time
 import strsimpy
 
 SCALE = 0.25
-VIDEO_TEMP   = 'temp.avi'
+# VIDEO_TEMP   = 'temp.avi'
 VIDEO_OUTPUT = 'output.mp4'
-VIDEO_FACE_D = 'output.avi'
-# AUDIO_OUTPUT = 'output.wav'
 
 class VSRHandler(BaseHandler):
     NLEV_THRESHOLD = 0.5
@@ -28,8 +27,8 @@ class VSRHandler(BaseHandler):
         if data is None:
             return data
 
-        if os.path.isfile(VIDEO_TEMP):
-            os.remove(VIDEO_TEMP)
+        # if os.path.isfile(VIDEO_TEMP):
+        #     os.remove(VIDEO_TEMP)
         
         if os.path.isfile(VIDEO_OUTPUT):
             os.remove(VIDEO_OUTPUT)
@@ -45,9 +44,9 @@ class VSRHandler(BaseHandler):
                 data = json.loads(data)
             except:
                 is_dict = False
-                with open(VIDEO_TEMP, 'wb') as out_file:
+                with open(VIDEO_OUTPUT, 'wb') as out_file:
                     out_file.write(data)
-                    object_name = VIDEO_TEMP
+                    object_name = VIDEO_OUTPUT
         phrase = ''
         if is_dict:
             # Download file
@@ -55,25 +54,31 @@ class VSRHandler(BaseHandler):
             bucket_name = data['bucket_name']
             object_name = data['object_name']
             phrase = data['phrase']
+            object_encoded_name = object_name.replace('/', '%2F')
+            result_object_name = object_name.split('/')[-1]
+            print(data)
+
             os.system(
                 f'curl -X GET ' +
-                f'-H "Authorization: Bearer {token}" -o {object_name} '
-                f'"https://storage.googleapis.com/storage/v1/b/{bucket_name}/o/{object_name}?alt=media"'
+                f'-H "Authorization: Bearer {token}" -o {result_object_name} '
+                f'"https://storage.googleapis.com/storage/v1/b/{bucket_name}/o/{object_encoded_name}?alt=media"'
             )
 
+        new_res_object_name = VIDEO_OUTPUT
+
+        if result_object_name[-5:] == '.webm':
+            command = f'ffmpeg -y -fflags +genpts -i {result_object_name} ' +\
+                f'-max_muxing_queue_size 1024 -r 25 {new_res_object_name}'
+            os.system(command)
+        else:
+            new_res_object_name = result_object_name
+
         subprocess.call(
-            f'ffmpeg -y -i {object_name} -qscale:v 2 -threads 10 ' +\
+            f'ffmpeg -y -i {new_res_object_name} -qscale:v 2 -threads 10 ' +\
             f'-async 1 -r 25 -vf scale="-2:640" {VIDEO_OUTPUT} -loglevel panic',
-            # f'ffmpeg -y -i {object_name} -r 24 {VIDEO_OUTPUT}',
             shell=True, 
             stdout=None,    
         )
-
-        # subprocess.call(
-        #     f'ffmpeg -y -i {VIDEO_OUTPUT} -vf scale="-2:640" {VIDEO_FACE_D}',
-        #     shell=True,
-        #     stdout=None
-        # )
 
         return VIDEO_OUTPUT, phrase
 
@@ -105,6 +110,11 @@ class VSRHandler(BaseHandler):
         if pred_text == '':
             code = 2
         else:
+            with open('word_map.json') as f:
+                word_map = json.load(f)
+            pred_text = pred_text.strip().upper()
+            for pat, repl in word_map.items():
+                pred_text = re.sub(pat, repl, pred_text)
             code = int(self.compare_texts(pred_text, target_text))
             
         return [{
@@ -125,7 +135,9 @@ class VSRHandler(BaseHandler):
         file, phrase = self.preprocess(data)
         print('VP: ', time.time() - cur_time)
         text = self.inference(file)
-        return self.postprocess(text, phrase)
+        result = self.postprocess(text, phrase)
+        print(result)
+        return result
 
     def compare_texts(self, pred_text: str, target_text: str):
         pred_text   = pred_text  .strip().upper()
