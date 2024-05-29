@@ -80,6 +80,7 @@ RUN apt-get -y update
 RUN apt-get -y upgrade
 RUN apt-get install -y ffmpeg
 RUN pip install strsimpy
+RUN pip install setuptools==69.5.1
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY config.properties /home/model-server/config.properties

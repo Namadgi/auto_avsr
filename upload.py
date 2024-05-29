@@ -29,7 +29,7 @@ from google.cloud import aiplatform
 #     # experiment_description='my experiment description'
 # )
 
-VERSION = '3-dev'
+VERSION = '4'
 APP_NAME = 'vsr'
 CUSTOM_PREDICTOR_IMAGE_URI = 'us-central1-docker.pkg.dev/biometry-416410/biometry-docker-repo/vsr:latest'
 

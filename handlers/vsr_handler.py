@@ -27,6 +27,8 @@ class VSRHandler(BaseHandler):
         if data is None:
             return data
 
+        cur_time = time.time()
+
         # if os.path.isfile(VIDEO_TEMP):
         #     os.remove(VIDEO_TEMP)
         
@@ -63,22 +65,22 @@ class VSRHandler(BaseHandler):
                 f'-H "Authorization: Bearer {token}" -o {result_object_name} '
                 f'"https://storage.googleapis.com/storage/v1/b/{bucket_name}/o/{object_encoded_name}?alt=media"'
             )
+        print('DL: ', time.time() - cur_time)
 
-        new_res_object_name = VIDEO_OUTPUT
-
+        cur_time = time.time()
         if result_object_name[-5:] == '.webm':
-            command = f'ffmpeg -y -fflags +genpts -i {result_object_name} ' +\
-                f'-max_muxing_queue_size 1024 -r 25 {new_res_object_name}'
+            command = f'ffmpeg -y -fflags +genpts -i {result_object_name} -qscale:v 2 ' +\
+                f'-max_muxing_queue_size 1024 -async 1 -r 25 -vf scale="-2:640" {VIDEO_OUTPUT}'
             os.system(command)
         else:
-            new_res_object_name = result_object_name
+            subprocess.call(
+                f'ffmpeg -y -i {result_object_name} -qscale:v 2 ' +\
+                f'-async 1 -r 25 -vf scale="-2:640" {VIDEO_OUTPUT}',
+                shell=True, 
+                stdout=None,    
+            )
+        print('VP: ', time.time() - cur_time)
 
-        subprocess.call(
-            f'ffmpeg -y -i {new_res_object_name} -qscale:v 2 -threads 10 ' +\
-            f'-async 1 -r 25 -vf scale="-2:640" {VIDEO_OUTPUT} -loglevel panic',
-            shell=True, 
-            stdout=None,    
-        )
 
         return VIDEO_OUTPUT, phrase
 
@@ -131,9 +133,7 @@ class VSRHandler(BaseHandler):
         :param context: Initial context contains model server system properties.
         :return: prediction output
         """
-        cur_time = time.time()
         file, phrase = self.preprocess(data)
-        print('VP: ', time.time() - cur_time)
         text = self.inference(file)
         result = self.postprocess(text, phrase)
         print(result)

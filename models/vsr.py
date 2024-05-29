@@ -33,10 +33,9 @@ class VSR(torch.nn.Module):
         print('FC: ', time.time() - cur_time)
         if video is None:
             return ''
-        # print(video, type(video))
+        cur_time = time.time()
         video = torch.tensor(video)
         video = video.permute((0, 3, 1, 2))
-        cur_time = time.time()
         video = self.video_transform(video)
         print('VE: ', time.time() - cur_time)
         cur_time = time.time()
