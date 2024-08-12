@@ -74,8 +74,8 @@ class VSRHandler(BaseHandler):
             os.system(command)
         else:
             subprocess.call(
-                f'ffmpeg -y -i {result_object_name} -qscale:v 2 ' +\
-                f'-async 1 -r 25 -vf scale="-2:640" {VIDEO_OUTPUT}',
+                f'ffmpeg -hwaccel cuda -y -i {result_object_name} -qscale:v 2 ' +\
+                f'-async 1 -r 25 -vf scale="-2:320" {VIDEO_OUTPUT}',
                 shell=True, 
                 stdout=None,    
             )
@@ -108,7 +108,8 @@ class VSRHandler(BaseHandler):
             'Phrase does not match',
             'No face present',
         ]
-
+        
+        similarity = 0
         if pred_text == '':
             code = 2
         else:
@@ -117,12 +118,13 @@ class VSRHandler(BaseHandler):
             pred_text = pred_text.strip().upper()
             for pat, repl in word_map.items():
                 pred_text = re.sub(pat, repl, pred_text)
-            code = int(self.compare_texts(pred_text, target_text))
+            code, similarity = self.compare_texts(pred_text, target_text)
             
         return [{
             'code': code,
             'description': descriptions[code],
             'result': pred_text,
+            'similarity': similarity,
         }]
 
     def handle(self, data, context):
@@ -139,10 +141,10 @@ class VSRHandler(BaseHandler):
         print(result)
         return result
 
-    def compare_texts(self, pred_text: str, target_text: str):
+    def compare_texts(self, pred_text: str, target_text: str) -> tuple:
         pred_text   = pred_text  .strip().upper()
         target_text = target_text.strip().upper()
         nlev = strsimpy.NormalizedLevenshtein()
         nlev_similarity_score = nlev.similarity(pred_text, target_text)
-        return nlev_similarity_score < self.NLEV_THRESHOLD
+        return int(nlev_similarity_score < self.NLEV_THRESHOLD), nlev_similarity_score
             
