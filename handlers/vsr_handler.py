@@ -74,7 +74,7 @@ class VSRHandler(BaseHandler):
             os.system(command)
         else:
             subprocess.call(
-                f'ffmpeg -hwaccel cuda -y -i {result_object_name} -qscale:v 2 ' +\
+                f'ffmpeg -y -nostdin -i {result_object_name} -qscale:v 2 ' +\
                 f'-async 1 -r 25 -vf scale="-2:320" {VIDEO_OUTPUT}',
                 shell=True, 
                 stdout=None,    

@@ -73,7 +73,7 @@ RUN cd /home/dependencies && \
 
 
 # Install extra packages
-RUN pip install torchserve torch-model-archiver
+RUN pip install torchserve==0.9.0 torch-model-archiver
 RUN pip install pyyaml
 
 RUN apt-get -y update
