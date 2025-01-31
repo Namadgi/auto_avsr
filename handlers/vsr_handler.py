@@ -124,7 +124,7 @@ class VSRHandler(BaseHandler):
             'code': code,
             'description': descriptions[code],
             'result': pred_text,
-            'similarity': similarity,
+            'score': round(similarity * 100, 2),
         }]
 
     def handle(self, data, context):
