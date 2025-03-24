@@ -10,7 +10,7 @@ import copy
 
 import torch
 
-from trf_layer_norm import LayerNorm
+from src.ml_models.trf_layer_norm import LayerNorm
 
 from torch import nn
 

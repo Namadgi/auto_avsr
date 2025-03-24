@@ -7,25 +7,25 @@
 """Encoder definition."""
 
 import torch
-from backbone_conv1d_extractor import Conv1dResNet
-from backbone_conv3d_extractor import Conv3dResNet
+from src.ml_models.backbone_conv1d_extractor import Conv1dResNet
+from src.ml_models.backbone_conv3d_extractor import Conv3dResNet
 
-from e2e_utils import rename_state_dict
+from src.ml_models.e2e_utils import rename_state_dict
 
-from trf_attention import (
+from src.ml_models.trf_attention import (
     MultiHeadedAttention,  # noqa: H301
     RelPositionMultiHeadedAttention,  # noqa: H301
 )
-from trf_convolution import ConvolutionModule
-from trf_embedding import (
+from src.ml_models.trf_convolution import ConvolutionModule
+from src.ml_models.trf_embedding import (
     PositionalEncoding,  # noqa: H301
     RelPositionalEncoding,  # noqa: H301
 )
-from trf_encoder_layer import EncoderLayer
-from trf_layer_norm import LayerNorm
-from trf_positionwise_feed_forward import PositionwiseFeedForward
+from src.ml_models.trf_encoder_layer import EncoderLayer
+from src.ml_models.trf_layer_norm import LayerNorm
+from src.ml_models.trf_positionwise_feed_forward import PositionwiseFeedForward
 
-from trf_repeat import repeat
+from src.ml_models.trf_repeat import repeat
 
 
 def _pre_hook(

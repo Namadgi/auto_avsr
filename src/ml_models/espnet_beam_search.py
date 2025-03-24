@@ -6,8 +6,8 @@ from typing import Any, Dict, List, NamedTuple, Tuple, Union
 
 import torch
 
-from espnet_e2e_asr_common import end_detect
-from espnet_scorer_interface import PartialScorerInterface, ScorerInterface
+from src.ml_models.espnet_e2e_asr_common import end_detect
+from src.ml_models.espnet_scorer_interface import PartialScorerInterface, ScorerInterface
 
 
 class Hypothesis(NamedTuple):

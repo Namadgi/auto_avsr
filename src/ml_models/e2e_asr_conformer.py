@@ -7,16 +7,16 @@ import logging
 import numpy
 import torch
 
-from e2e_ctc import CTC
-from e2e_utils import (
+from src.ml_models.e2e_ctc import CTC
+from src.ml_models.e2e_utils import (
     make_non_pad_mask,
     th_accuracy,
 )
-from trf_add_sos_eos import add_sos_eos
-from trf_decoder import Decoder
-from trf_encoder import Encoder
-from trf_label_smoothing_loss import LabelSmoothingLoss
-from trf_mask import target_mask
+from src.ml_models.trf_add_sos_eos import add_sos_eos
+from src.ml_models.trf_decoder import Decoder
+from src.ml_models.trf_encoder import Encoder
+from src.ml_models.trf_label_smoothing_loss import LabelSmoothingLoss
+from src.ml_models.trf_mask import target_mask
 from argparse import Namespace
 
 ARGS = {

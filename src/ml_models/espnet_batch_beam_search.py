@@ -5,7 +5,7 @@ from typing import Any, Dict, List, NamedTuple, Tuple
 
 import torch
 
-from espnet_beam_search import BeamSearch, Hypothesis
+from src.ml_models.espnet_beam_search import BeamSearch, Hypothesis
 from torch.nn.utils.rnn import pad_sequence
 
 

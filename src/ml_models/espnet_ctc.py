@@ -3,8 +3,8 @@
 import numpy as np
 import torch
 
-from espnet_ctc_prefix_score import CTCPrefixScore, CTCPrefixScoreTH
-from espnet_scorer_interface import BatchPartialScorerInterface
+from src.ml_models.espnet_ctc_prefix_score import CTCPrefixScore, CTCPrefixScoreTH
+from src.ml_models.espnet_scorer_interface import BatchPartialScorerInterface
 
 
 class CTCPrefixScorer(BatchPartialScorerInterface):

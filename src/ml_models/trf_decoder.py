@@ -10,17 +10,17 @@ from typing import Any, List, Tuple
 
 import torch
 
-from e2e_utils import rename_state_dict
-from trf_attention import MultiHeadedAttention
-from trf_decoder_layer import DecoderLayer
-from trf_embedding import PositionalEncoding
-from trf_layer_norm import LayerNorm
-from trf_mask import subsequent_mask
-from trf_positionwise_feed_forward import (
+from src.ml_models.e2e_utils import rename_state_dict
+from src.ml_models.trf_attention import MultiHeadedAttention
+from src.ml_models.trf_decoder_layer import DecoderLayer
+from src.ml_models.trf_embedding import PositionalEncoding
+from src.ml_models.trf_layer_norm import LayerNorm
+from src.ml_models.trf_mask import subsequent_mask
+from src.ml_models.trf_positionwise_feed_forward import (
     PositionwiseFeedForward,  # noqa: H301
 )
-from trf_repeat import repeat
-from espnet_scorer_interface import BatchScorerInterface
+from src.ml_models.trf_repeat import repeat
+from src.ml_models.espnet_scorer_interface import BatchScorerInterface
 
 
 def _pre_hook(

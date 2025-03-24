@@ -2,13 +2,11 @@ import torch
 import torchaudio
 from torch import nn
 
-from data_transforms import TextTransform
-from espnet_batch_beam_search import BatchBeamSearch
-
-from espnet_length_bonus import LengthBonus
-from espnet_ctc import CTCPrefixScorer
-
-from e2e_asr_conformer import E2E
+from src.ml_models.data_transforms import TextTransform
+from src.ml_models.espnet_batch_beam_search import BatchBeamSearch
+from src.ml_models.espnet_length_bonus import LengthBonus
+from src.ml_models.espnet_ctc import CTCPrefixScorer
+from src.ml_models.e2e_asr_conformer import E2E
 
 def compute_word_level_distance(seq1, seq2):
     return torchaudio.functional.edit_distance(seq1.lower().split(), seq2.lower().split())
@@ -18,7 +16,10 @@ class ModelModule(nn.Module):
         super().__init__()
         self.device = 'cuda'
 
-        self.text_transform = TextTransform()
+        self.text_transform = TextTransform(
+            sp_model_path="extra_files/unigram5000.model",
+            dict_path="extra_files/unigram5000_units.txt"
+        )
         self.token_list = self.text_transform.token_list
         self.model = E2E(len(self.token_list))
 

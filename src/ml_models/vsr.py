@@ -4,18 +4,18 @@ import torchvision
 import cv2
 import numpy as np
 import time
-from data_transforms import VideoTransform
-from retina_detector import LandmarksDetector
-from retina_video_process import VideoProcess
+from src.ml_models.data_transforms import VideoTransform
+from src.ml_models.retina_detector import LandmarksDetector
+from src.ml_models.retina_video_process import VideoProcess
 
-from model_module import ModelModule
+from src.ml_models.model_module import ModelModule
 
 class VSR(torch.nn.Module):
     def __init__(self):
         super(VSR, self).__init__()
         
         self.landmarks_detector = LandmarksDetector(device="cuda")
-        self.video_process = VideoProcess(convert_gray=False)
+        self.video_process = VideoProcess(mean_face_path="extra_files/retina_mean.npy", convert_gray=False)
         self.video_transform = VideoTransform(subset="test")
         self.modelmodule = ModelModule()
 

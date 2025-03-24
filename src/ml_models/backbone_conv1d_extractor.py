@@ -4,7 +4,7 @@
 # Copyright 2021 Imperial College London (Pingchuan Ma)
 # Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
 import torch
-from backbone_resnet1d import (
+from src.ml_models.backbone_resnet1d import (
     BasicBlock1D,
     ResNet1D,
 )

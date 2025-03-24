@@ -6,8 +6,8 @@
 
 import torch
 import torch.nn as nn
-from backbone_resnet import BasicBlock, ResNet
-from trf_convolution import Swish
+from src.ml_models.backbone_resnet import BasicBlock, ResNet
+from src.ml_models.trf_convolution import Swish
 
 
 def threeD_to_2D_tensor(x):

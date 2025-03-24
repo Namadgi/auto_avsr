@@ -1,8 +1,9 @@
 .git
 .gcloudignore
 .gitignore
+*.ipynb_checkpoints/
+__pycache__/
+
 data/
-model_weights/
-models/
-handlers/
-extra_files/
+misc/
+model_store/

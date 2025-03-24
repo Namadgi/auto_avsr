@@ -28,7 +28,7 @@ RUN update-alternatives --install /usr/local/bin/pip pip /usr/local/bin/pip3 1
 
 RUN pip install -U pip setuptools
 
-# For CUDA  install 
+# For CUDA install 
 RUN export USE_CUDA=1
 ARG CUDA=1
 RUN if [ $CUDA==1 ]; then \ 
@@ -50,71 +50,59 @@ RUN apt-get update && apt-get install --no-install-recommends -y  \
     python3-tk && \
     rm -rf /var/lib/apt/lists/*
 
-# RUN git lfs install
-RUN mkdir /home/dependencies
+# Create app directory
+RUN mkdir -p /home/app
+WORKDIR /home/app
 
-# Pip dependencies
-COPY requirements.txt /home/model-server/requirements.txt
-RUN pip install --no-cache-dir -r /home/model-server/requirements.txt
+# Copy requirements first for better caching
+COPY requirements.txt /home/app/requirements.txt
+RUN pip install --no-cache-dir -r /home/app/requirements.txt
 
-# Add user for execute the commands 
-RUN useradd -m model-server
+# Install extra packages
+RUN pip install pyyaml
+RUN pip install strsimpy
+RUN pip install setuptools==69.5.1
+RUN pip install fastapi uvicorn python-multipart pydantic
 
-RUN cd /home/dependencies && \
+# Install ffmpeg
+RUN apt-get -y update && \
+    apt-get -y upgrade && \
+    apt-get install -y ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create dependencies directory and install face detection
+RUN mkdir /home/dependencies && \
+    cd /home/dependencies && \
     git clone https://github.com/hhj1897/face_detection.git && \
     cd /home/dependencies/face_detection && \
     git lfs pull && \
     pip install -e .
 
+# Install face alignment
 RUN cd /home/dependencies && \
     git clone https://github.com/hhj1897/face_alignment.git && \
     cd /home/dependencies/face_alignment && \
     pip install -e . --pre
 
+# Copy application code
+COPY src/ /home/app/src/
+COPY app.py /home/app/
+COPY extra_files/ /home/app/extra_files/
 
-# Install extra packages
-RUN pip install torchserve==0.9.0 torch-model-archiver
-RUN pip install pyyaml
+# Create user for running the application
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /home/app && \
+    chown -R appuser:appuser /home/dependencies
 
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get install -y ffmpeg
-RUN pip install strsimpy
-RUN pip install setuptools==69.5.1
+# Create tmp directory for video processing
+RUN mkdir -p /home/app/tmp && \
+    chown -R appuser:appuser /home/app/tmp
 
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-COPY config.properties /home/model-server/config.properties
+# Switch to non-root user
+USER appuser
 
-# Create two folder for models 
-RUN mkdir /home/model-server/model-store
-# Copy all required models and pipelines inside docker 
-COPY model_store /home/model-server/model-store
+# Expose port for FastAPI
+EXPOSE 8080
 
-# RUN mkdir /home/model-server/models
-# COPY models /home/model-server/models
-
-# RUN mkdir /home/model-server/data
-# COPY data /home/model-server/data
-
-# RUN mkdir /home/model-server/model_weights
-# COPY model_weights /home/model-server/model_weights
-
-# Giving rights for execute for entrypoint
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && mkdir -p /home/model-server/tmp \
-    && chown -R model-server /home/model-server
-
-# RUN mkdir -p /home/model-server/tmp \
-#     && chown -R model-server /home/model-server
-
-
-# GIVING rights to execute 
-RUN chown -R model-server /home/model-server/model-store
-
-EXPOSE 8080 8081 8082
-
-USER model-server
-WORKDIR /home/model-server
-ENV TEMP=/home/model-server/tmp
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["serve", "curl"]
+# Run the application
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]

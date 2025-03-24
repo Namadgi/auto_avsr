@@ -6,7 +6,7 @@ import six
 import torch
 import torch.nn.functional as F
 
-from e2e_utils import to_device
+from src.ml_models.e2e_utils import to_device
 
 
 class CTC(torch.nn.Module):
