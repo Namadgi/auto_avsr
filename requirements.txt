@@ -6,3 +6,15 @@ sentencepiece
 scikit-image
 av
 ffmpeg-python
+fastapi
+uvicorn
+python-multipart
+strsimpy
+
+# OpenTelemetry (GCP exporters)
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-gcp-trace
+opentelemetry-exporter-gcp-monitoring
+google-cloud-trace
+google-cloud-monitoring

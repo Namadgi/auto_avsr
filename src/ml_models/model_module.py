@@ -1,6 +1,7 @@
 import torch
 import torchaudio
 from torch import nn
+import time
 
 from src.ml_models.data_transforms import TextTransform
 from src.ml_models.espnet_batch_beam_search import BatchBeamSearch
@@ -28,13 +29,24 @@ class ModelModule(nn.Module):
 
     def forward(self, sample):
         self.beam_search = get_beam_search_decoder(self.model, self.token_list)
+        cur_time = time.time()
         enc_feat, _ = self.model.encoder(sample.unsqueeze(0).to(self.device), None)
         enc_feat = enc_feat.squeeze(0)
-
+        print('Encoder: ', time.time() - cur_time)
+        
+        cur_time = time.time()
         nbest_hyps = self.beam_search(enc_feat)
+        print('Beam search: ', time.time() - cur_time)
+        
+        cur_time = time.time()
         nbest_hyps = [h.asdict() for h in nbest_hyps[: min(len(nbest_hyps), 1)]]
         predicted_token_id = torch.tensor(list(map(int, nbest_hyps[0]["yseq"][1:])))
+        print('Predicted token id: ', time.time() - cur_time)
+        
+        cur_time = time.time()
         predicted = self.text_transform.post_process(predicted_token_id).replace("<eos>", "")
+        print('Post process: ', time.time() - cur_time)
+        
         return predicted
 
 

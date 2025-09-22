@@ -15,7 +15,7 @@ RUN apt-get update \
     wget \
     && rm -rf /var/lib/apt/lists/* \
     && cd /tmp \
-    && curl -O https://bootstrap.pypa.io/get-pip.py \
+    && curl -O https://bootstrap.pypa.io/pip/3.8/get-pip.py \
     && python3 get-pip.py \
     && rm get-pip.py
 
@@ -58,24 +58,25 @@ WORKDIR /home/app
 COPY requirements.txt /home/app/requirements.txt
 RUN pip install --no-cache-dir -r /home/app/requirements.txt
 
-# Install extra packages
-RUN pip install pyyaml
-RUN pip install strsimpy
-RUN pip install setuptools==69.5.1
-RUN pip install fastapi uvicorn python-multipart pydantic
-
 # Install ffmpeg
 RUN apt-get -y update && \
     apt-get -y upgrade && \
     apt-get install -y ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
+RUN pip install gdown
+
 # Create dependencies directory and install face detection
 RUN mkdir /home/dependencies && \
     cd /home/dependencies && \
-    git clone https://github.com/hhj1897/face_detection.git && \
+    GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/hhj1897/face_detection.git && \
     cd /home/dependencies/face_detection && \
-    git lfs pull && \
+    gdown https://drive.google.com/uc?id=15zP8BP-5IvWXWZoYTNdvUJUiBqZ1hxu1 && \
+    gdown https://drive.google.com/uc?id=14KX6VqF69MdSPk3Tr9PlDYbq7ArpdNUW && \
+    gdown https://drive.google.com/uc?id=1KafnHz7ccT-3IyddBsL5yi2xGtxAKypt && \
+    mv mobilenet0.25_Final.pth ibug/face_detection/retina_face/weights/ && \
+    mv Resnet50_Final.pth      ibug/face_detection/retina_face/weights/ && \
+    mv sfd_face.pth            ibug/face_detection/s3fd/weights/s3fd_weights.pth && \
     pip install -e .
 
 # Install face alignment
@@ -88,6 +89,8 @@ RUN cd /home/dependencies && \
 COPY src/ /home/app/src/
 COPY app.py /home/app/
 COPY extra_files/ /home/app/extra_files/
+COPY docker-entrypoint.sh /home/app/docker-entrypoint.sh
+RUN chmod +x /home/app/docker-entrypoint.sh
 
 # Create user for running the application
 RUN useradd -m appuser && \
@@ -101,8 +104,20 @@ RUN mkdir -p /home/app/tmp && \
 # Switch to non-root user
 USER appuser
 
+# Configure OpenTelemetry based on deployment environment
+# For GCP Cloud Run (recommended for GCP):
+ENV OTEL_ENV=gcp
+ENV OTEL_SERVICE_NAME=gpu-service
+ENV OTEL_TRACES_EXPORTER=cloud_trace
+ENV OTEL_METRICS_EXPORTER=cloud_monitoring
+
+# COPY gcp.json /home/app/gcp.json
+ENV GOOGLE_CLOUD_PROJECT=biometry-416410
+# ENV GOOGLE_APPLICATION_CREDENTIALS=gcp.json
+
 # Expose port for FastAPI
 EXPOSE 8080
 
 # Run the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+ENTRYPOINT ["/home/app/docker-entrypoint.sh"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]
