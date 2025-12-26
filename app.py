@@ -11,6 +11,10 @@ vsr_service = VSRService()
 # W3C Trace Context propagation
 from opentelemetry.propagate import extract
 
+@app.get("/health")
+async def health():
+    return JSONResponse(content={"status": "healthy"})
+
 @app.post("/predictions/vsr", response_model=ResponseModel)
 async def process_video(data: GCSRequest, request: Request):
     """
