@@ -4,6 +4,7 @@ import torchvision
 import cv2
 import numpy as np
 import time
+import logging
 from src.ml_models.data_transforms import VideoTransform
 from src.ml_models.retina_detector import LandmarksDetector
 from src.ml_models.retina_video_process import VideoProcess
@@ -24,24 +25,24 @@ class VSR(torch.nn.Module):
         data_filename = os.path.abspath(data_filename)
         cur_time = time.time()
         video = self.load_video(data_filename)
-        print('IP: ', time.time() - cur_time)
+        logging.info(f"IP: {time.time() - cur_time:.4f}s")
         cur_time = time.time()
         landmarks = self.landmarks_detector(video)
-        print('FD: ', time.time() - cur_time)
+        logging.info(f"FD: {time.time() - cur_time:.4f}s")
         cur_time = time.time()
         video = self.video_process(video, landmarks)
-        print('FC: ', time.time() - cur_time)
+        logging.info(f"FC: {time.time() - cur_time:.4f}s")
         if video is None:
             return ''
         cur_time = time.time()
         video = torch.tensor(video)
         video = video.permute((0, 3, 1, 2))
         video = self.video_transform(video)
-        print('VE: ', time.time() - cur_time)
+        logging.info(f"VE: {time.time() - cur_time:.4f}s")
         cur_time = time.time()
         with torch.no_grad():
             transcript = self.modelmodule(video)
-        print('VI: ', time.time() - cur_time)
+        logging.info(f"VI: {time.time() - cur_time:.4f}s")
         return transcript
 
     def load_video(self, data_filename):

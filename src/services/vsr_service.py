@@ -40,8 +40,21 @@ class VSRService:
 
     def _setup_telemetry(self):
         """Initialize OpenTelemetry tracer and meter for GCP."""
+        import uuid
+        from opentelemetry.sdk.resources import Resource
+
+        # Identify instances and workers uniquely using Cloud Run Instance ID and PID
+        instance_id = os.getenv("CLOUD_RUN_INSTANCE", os.getenv("HOSTNAME", str(uuid.uuid4())))
+        process_id = os.getpid()
+        host_id = f"{instance_id}-{process_id}"
+
+        resource = Resource.create({
+            "service.name": "ml-vsr",
+            "host.id": host_id
+        })
+
         # Set up tracing for GCP Cloud Trace
-        trace.set_tracer_provider(TracerProvider())
+        trace.set_tracer_provider(TracerProvider(resource=resource))
         tracer_provider = trace.get_tracer_provider()
         tracer_provider.add_span_processor(
             BatchSpanProcessor(CloudTraceSpanExporter(project_id=PROJECT_ID))
@@ -53,7 +66,7 @@ class VSRService:
             exporter=CloudMonitoringMetricsExporter(project_id=PROJECT_ID),
             export_interval_millis=60000
         )
-        metrics.set_meter_provider(MeterProvider(metric_readers=[reader]))
+        metrics.set_meter_provider(MeterProvider(metric_readers=[reader], resource=resource))
         self.meter = metrics.get_meter(__name__)
 
         # Create metrics
