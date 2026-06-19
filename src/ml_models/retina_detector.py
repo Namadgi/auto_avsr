@@ -7,6 +7,7 @@ import cv2
 import time
 import warnings
 import numpy as np
+import logging
 
 from ibug.face_alignment import FANPredictor
 from ibug.face_detection import RetinaFacePredictor
@@ -57,7 +58,7 @@ class LandmarksDetector:
                 rescaled_face_points[:, 1] = rescaled_face_points[:, 1] * (w // w_new)
                 landmarks.append(rescaled_face_points)
             ld_time_total += time.time() - cur_time
-        print('FD:', fd_time_total)
-        print('LD:', ld_time_total)
+        logging.info(f"FD: {fd_time_total:.4f}s")
+        logging.info(f"LD: {ld_time_total:.4f}s")
 
         return landmarks
