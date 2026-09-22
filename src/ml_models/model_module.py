@@ -30,6 +30,8 @@ class ModelModule(nn.Module):
         self.beam_size = beam_size
         self.ctc_weight = ctc_weight
         self.decode_mode = decode_mode
+        if isinstance(autocast_dtype, str):
+            autocast_dtype = {'fp16': torch.float16, 'bf16': torch.bfloat16}[autocast_dtype]
         self.autocast_dtype = autocast_dtype
         self.timer = timer or StageTimer(device, sync=False)
 
