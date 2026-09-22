@@ -43,7 +43,9 @@ class ModelModule(nn.Module):
         self.model.to(self.device)
         # BatchBeamSearch is stateless between calls (per-request state travels in the
         # hypotheses), so it is safe to build once instead of on every forward().
-        self.beam_search = get_beam_search_decoder(
+        # It is an nn.Module that re-registers model.decoder/model.ctc under nn_dict.*, so
+        # keep it out of this module's state_dict (checkpoints must keep prod's key layout).
+        self.__dict__['beam_search'] = get_beam_search_decoder(
             self.model, self.token_list, ctc_weight=self.ctc_weight, beam_size=self.beam_size
         )
 
