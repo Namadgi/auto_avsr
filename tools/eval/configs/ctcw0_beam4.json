@@ -1,0 +1,5 @@
+{
+ "name": "ctcw0_beam4",
+ "ctc_weight": 0.0,
+ "beam_size": 4
+}
