@@ -16,3 +16,6 @@ model_store/
 
 src/model_weights/
 gcp.json
+# eval harness
+.venv-eval/
+results/

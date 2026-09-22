@@ -16,15 +16,17 @@ warnings.filterwarnings("ignore")
 
 
 class LandmarksDetector:
-    def __init__(self, device="cuda:0", model_name="mobilenet0.25"):
+    def __init__(self, device="cuda:0", model_name="mobilenet0.25", skip_step=5):
         self.face_detector = RetinaFacePredictor(
             device=device,
             threshold=0.8,
             model=RetinaFacePredictor.get_model(model_name),
         )
         self.landmark_detector = FANPredictor(device=device, model=None)
+        self.skip_step = skip_step
 
-    def __call__(self, video_frames, skip_step=5):
+    def __call__(self, video_frames, skip_step=None):
+        skip_step = self.skip_step if skip_step is None else skip_step
         landmarks = []
         fd_time_total = 0
         ld_time_total = 0

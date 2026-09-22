@@ -1,0 +1,4 @@
+{
+ "name": "ctc_greedy",
+ "decode_mode": "ctc_greedy"
+}
