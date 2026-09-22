@@ -234,7 +234,7 @@ class VSRService:
         workdir = tempfile.mkdtemp(prefix="vsr_req_")
         video_output = os.path.join(workdir, VIDEO_OUTPUT)
 
-        if isinstance(data, UploadFile):
+        if isinstance(data, UploadFile) or hasattr(data, "file"):  # starlette vs fastapi UploadFile
             # Handle file upload
             with self.tracer.start_as_current_span("upload_file_handling") as span:
                 span.set_attribute("input_type", "upload_file")
