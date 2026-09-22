@@ -1,5 +1,5 @@
 """Expand labeled clips into decision samples: samples.csv with columns
-clip, phrase, kind (match | wrong | near), expected (0/1/2 when known from prod, else '').
+clip, phrase, kind (match | wrong | near | transcript_only), expected (0/1/2 when known from prod, else '').
 
     python -m tools.eval.expand --manifest manifest.csv --out samples.csv [--seed 472]
 
@@ -40,6 +40,8 @@ def main():
     for r in csv.DictReader(open(a.manifest)):
         phrase = r['phrase'].strip().upper()
         if not phrase or r['label_source'].startswith(('TBD', 'REVIEW')):
+            if not any(o['clip'] == r['clip'] for o in out):
+                out.append({'clip': r['clip'], 'phrase': '', 'kind': 'transcript_only', 'expected': ''})
             continue
         out.append({'clip': r['clip'], 'phrase': phrase, 'kind': 'match', 'expected': r.get('prod_code', '')})
         words = phrase.split()
