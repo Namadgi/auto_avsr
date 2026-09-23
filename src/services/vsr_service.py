@@ -1,6 +1,8 @@
 import json
 import time
 import os
+import shutil
+import tempfile
 from fastapi import UploadFile, HTTPException
 import numpy as np
 import subprocess
@@ -24,6 +26,10 @@ from opentelemetry.trace import Status, StatusCode
 
 VIDEO_OUTPUT = 'vsr_output.mp4'
 PROJECT_ID = "biometry-416410"
+# Optional overrides for benchmarking (see tools/eval): VSR_CONFIG=<json with VSR kwargs>,
+# VSR_DISABLE_TELEMETRY=1 to keep test runs out of production Cloud Trace/Monitoring.
+VSR_CONFIG = os.getenv("VSR_CONFIG")
+VSR_DISABLE_TELEMETRY = os.getenv("VSR_DISABLE_TELEMETRY", "") == "1"
 
 class VSRService:
     NLEV_THRESHOLD = 0.5
@@ -56,17 +62,18 @@ class VSRService:
         # Set up tracing for GCP Cloud Trace
         trace.set_tracer_provider(TracerProvider(resource=resource))
         tracer_provider = trace.get_tracer_provider()
-        tracer_provider.add_span_processor(
-            BatchSpanProcessor(CloudTraceSpanExporter(project_id=PROJECT_ID))
-        )
+        if not VSR_DISABLE_TELEMETRY:
+            tracer_provider.add_span_processor(
+                BatchSpanProcessor(CloudTraceSpanExporter(project_id=PROJECT_ID))
+            )
         self.tracer = trace.get_tracer(__name__)
 
         # Set up metrics for GCP Cloud Monitoring
-        reader = PeriodicExportingMetricReader(
+        readers = [] if VSR_DISABLE_TELEMETRY else [PeriodicExportingMetricReader(
             exporter=CloudMonitoringMetricsExporter(project_id=PROJECT_ID),
             export_interval_millis=60000
-        )
-        metrics.set_meter_provider(MeterProvider(metric_readers=[reader], resource=resource))
+        )]
+        metrics.set_meter_provider(MeterProvider(metric_readers=readers, resource=resource))
         self.meter = metrics.get_meter(__name__)
 
         # Create metrics
@@ -103,7 +110,8 @@ class VSRService:
 
                 self.initialized = True
                 self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                self.model = VSR()
+                vsr_kwargs = json.loads(VSR_CONFIG) if VSR_CONFIG else {}
+                self.model = VSR(**vsr_kwargs)
                 self.model.load_state_dict(torch.load("src/model_weights/vsr.pth"))
                 self.model.to(self.device)
 
@@ -149,7 +157,10 @@ class VSRService:
                 # Inference with telemetry
                 with self.tracer.start_as_current_span("inference") as inference_span:
                     step_start_time = time.time()
-                    text = self.inference(file_path)
+                    try:
+                        text = self.inference(file_path)
+                    finally:
+                        shutil.rmtree(os.path.dirname(file_path), ignore_errors=True)
                     inference_duration = time.time() - step_start_time
 
                     # Record inference metrics and attributes
@@ -218,18 +229,20 @@ class VSRService:
 
         timings: List[Tuple[str, float]] = []
 
-        # Clean up existing files
-        if os.path.isfile(VIDEO_OUTPUT):
-            os.remove(VIDEO_OUTPUT)
+        # Per-request scratch dir: fixed filenames collide across the two uvicorn workers
+        # and any concurrent requests.
+        workdir = tempfile.mkdtemp(prefix="vsr_req_")
+        video_output = os.path.join(workdir, VIDEO_OUTPUT)
 
-        if isinstance(data, UploadFile):
+        if isinstance(data, UploadFile) or hasattr(data, "file"):  # starlette vs fastapi UploadFile
             # Handle file upload
             with self.tracer.start_as_current_span("upload_file_handling") as span:
                 span.set_attribute("input_type", "upload_file")
                 span.set_attribute("file_name", getattr(data, 'filename', 'unknown'))
 
                 start_ts = time.time()
-                with open(VIDEO_OUTPUT, 'wb') as out_file:
+                upload_path = os.path.join(workdir, "upload_" + os.path.basename(getattr(data, 'filename', '') or 'video.mp4'))
+                with open(upload_path, 'wb') as out_file:
                     content = data.file.read()
                     out_file.write(content)
                 duration = time.time() - start_ts
@@ -238,7 +251,7 @@ class VSRService:
                 span.set_attribute("upload_duration_seconds", duration)
                 span.set_attribute("file_size_bytes", len(content))
 
-            result_object_name = VIDEO_OUTPUT
+            result_object_name = upload_path
             phrase = ""
         else:
             # Handle GCS request
@@ -270,7 +283,7 @@ class VSRService:
                 span.set_attribute("gcs.object_name", object_name)
 
                 object_encoded_name = object_name.replace('/', '%2F')
-                result_object_name = f"vsr_{object_name.split('/')[-1]}"
+                result_object_name = os.path.join(workdir, f"vsr_{object_name.split('/')[-1]}")
 
                 with self.tracer.start_as_current_span("gcs_download") as download_span:
                     curl_cmd = f'curl -X GET -H "Authorization: Bearer {token}" -o {result_object_name} ' + \
@@ -292,16 +305,16 @@ class VSRService:
         # Process video with ffmpeg
         with self.tracer.start_as_current_span("ffmpeg_transcoding") as ffmpeg_span:
             ffmpeg_span.set_attribute("input_file", result_object_name)
-            ffmpeg_span.set_attribute("output_file", VIDEO_OUTPUT)
+            ffmpeg_span.set_attribute("output_file", video_output)
 
             if result_object_name.lower().endswith('.webm'):
                 command = f'ffmpeg -y -fflags +genpts -i {result_object_name} -qscale:v 2 ' + \
-                         f'-max_muxing_queue_size 1024 -async 1 -r 25 -vf scale="-2:640" {VIDEO_OUTPUT}'
+                         f'-max_muxing_queue_size 1024 -async 1 -r 25 -vf scale="-2:640" {video_output}'
                 ffmpeg_span.set_attribute("input_format", "webm")
                 ffmpeg_span.set_attribute("scale_resolution", "640")
             else:
                 command = f'ffmpeg -y -nostdin -i {result_object_name} -qscale:v 2 ' + \
-                         f'-async 1 -r 25 -vf scale="-2:320" {VIDEO_OUTPUT}'
+                         f'-async 1 -r 25 -vf scale="-2:320" {video_output}'
                 ffmpeg_span.set_attribute("input_format", "other")
                 ffmpeg_span.set_attribute("scale_resolution", "320")
 
@@ -320,7 +333,7 @@ class VSRService:
                 ffmpeg_span.set_attribute("ffmpeg_command", command)
                 raise HTTPException(status_code=500, detail="Failed to process video with FFmpeg")
 
-        return VIDEO_OUTPUT, phrase, timings
+        return video_output, phrase, timings
 
     def inference(self, file_path: str) -> str:
         """
