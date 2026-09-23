@@ -22,7 +22,13 @@ def pct(v, p):
     return v[min(len(v) - 1, int(p * len(v)))] if v else None
 
 
-def post_upload(url, path):
+def cpu_times():
+    with open('/proc/stat') as f:
+        v = list(map(int, f.readline().split()[1:8]))
+    return sum(v), v[3]  # total, idle
+
+
+def post_upload(url, path, timeout=120):
     boundary = uuid.uuid4().hex
     with open(path, 'rb') as f:
         data = f.read()
@@ -33,7 +39,7 @@ def post_upload(url, path):
                                  headers={'Content-Type': f'multipart/form-data; boundary={boundary}'})
     t0 = time.perf_counter()
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             status, text = r.status, r.read().decode()
     except urllib.error.HTTPError as e:
         status, text = e.code, e.read().decode()[:200]
@@ -50,9 +56,13 @@ def main():
     ap.add_argument('--duration', type=int, default=300)
     ap.add_argument('--out', required=True)
     ap.add_argument('--label', default='')
+    ap.add_argument('--files', nargs='*', help='restrict to these clip filenames (default: all)')
+    ap.add_argument('--timeout', type=int, default=120)
     a = ap.parse_args()
 
     clips = sorted(os.path.join(a.clips, f) for f in os.listdir(a.clips) if f.lower().endswith(('.mp4', '.webm', '.mov')))
+    if a.files:
+        clips = [c for c in clips if os.path.basename(c) in set(a.files)]
     # warm-up + health
     print('warm-up:', post_upload(a.url, clips[0])[:2])
 
@@ -62,11 +72,12 @@ def main():
     lock = threading.Lock()
 
     def worker(path):
-        lat, status, text = post_upload(a.url, path)
+        lat, status, text = post_upload(a.url, path, a.timeout)
         with lock:
             results.append({'clip': os.path.basename(path), 'latency_s': round(lat, 3), 'status': status,
                             'text': text[:120] if status != 200 else json.loads(text).get('result', '')[:60]})
 
+    cpu0 = cpu_times()
     t_start = time.time()
     interval = 1.0 / a.rate
     i = 0
@@ -77,7 +88,9 @@ def main():
     for th in threads:
         th.join(timeout=150)
     t_end = time.time()
+    cpu1 = cpu_times()
     smi.terminate()
+    cpu_busy = 100.0 * (1 - (cpu1[1] - cpu0[1]) / max(1, cpu1[0] - cpu0[0]))
     util = []
     for line in smi.stdout.read().splitlines():
         parts = [p.strip() for p in line.split(',')]
@@ -89,7 +102,8 @@ def main():
     summary = {
         'label': a.label, 'url': a.url, 'rate_target': a.rate, 'duration_s': round(t_end - t_start, 1),
         'requests': len(results), 'rate_actual': round(len(results) / (t_end - t_start), 3),
-        'errors': sum(r['status'] != 200 for r in results),
+        'errors': sum(r['status'] != 200 for r in results), 'clips_used': len(clips), 'timeout_s': a.timeout,
+        'cpu_busy_pct_mean': round(cpu_busy, 1), 'ncpu': os.cpu_count(),
         'gpu_util': {'mean': round(st.mean(gpu), 1), 'p50': pct(gpu, .5), 'p90': pct(gpu, .9), 'p95': pct(gpu, .95),
                      'p99': pct(gpu, .99), 'max': max(gpu), 'samples': len(gpu)} if gpu else None,
         'gpu_mem_util_mean': round(st.mean(u['mem'] for u in util), 1) if util else None,
