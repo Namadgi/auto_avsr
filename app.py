@@ -70,6 +70,18 @@ from opentelemetry.propagate import extract
 async def health():
     return JSONResponse(content={"status": "healthy"})
 
+@app.get("/ready")
+async def ready():
+    import torch
+    model_loaded = getattr(vsr_service, "initialized", False) and getattr(vsr_service, "model", None) is not None
+    device = getattr(vsr_service, "device", None)
+    gpu_ok = True
+    if getattr(device, "type", None) == "cuda":
+        gpu_ok = torch.cuda.is_available()
+    if model_loaded and gpu_ok:
+        return JSONResponse(content={"status": "ready"})
+    return JSONResponse(status_code=503, content={"status": "not_ready", "model_loaded": model_loaded, "gpu_ok": gpu_ok})
+
 @app.post("/predictions/vsr", response_model=ResponseModel)
 async def process_video(data: GCSRequest, request: Request):
     """
