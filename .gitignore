@@ -6,4 +6,13 @@ outputs/
 .idea/
 *.pyc
 *.tar
+*.pth
 .DS_Store
+*.ipynb_checkpoints/
+
+data/
+misc/
+model_store/
+
+src/model_weights/
+gcp.json
