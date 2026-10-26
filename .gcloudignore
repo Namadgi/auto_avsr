@@ -1,0 +1,10 @@
+.git
+.gcloudignore
+.gitignore
+*.ipynb_checkpoints/
+__pycache__/
+
+data/
+misc/
+model_store/
+gcp.json

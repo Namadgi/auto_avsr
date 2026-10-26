@@ -1,0 +1,37 @@
+{
+    "SARAH": "ZERO ",
+    "THERE": "ZERO",
+    "THEY KNOW": "ZERO",
+    "SIT ON": "ZERO",
+    "SINGLE": "ZERO",
+
+    "NO(?: |$)": "TWO ",
+    "TO(?: |$)": "TWO ",
+    "DUDE": "TWO",
+    "YOUR": "TWO",
+    
+    "SWEET": "THREE",
+    "DRA": "THREE",
+    "SORRY": "THREE",
+    
+    "FOR": "FOUR",
+    "STALL": "FOUR",
+    "FAR": "FOUR",
+    
+    "FILE": "FIVE",
+    "FOUL": "FIVE",
+
+    "YES": "SIX",
+    "SAYS": "SIX",
+    "THINGS": "SIX",
+    
+    "DIVING": "SEVEN",
+    "SAVING": "SEVEN",
+    
+    "I THINK": "EIGHT",
+    "EGGS": "EIGHT",
+    "IT(?: |$)": "EIGHT",
+    
+    "NOT": "NINE",   
+    "DOG": "NINE"  
+}

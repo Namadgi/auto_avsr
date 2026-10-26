@@ -1,0 +1,75 @@
+import os
+import torch
+import torchvision
+import cv2
+import numpy as np
+import time
+import logging
+from src.ml_models.data_transforms import VideoTransform
+from src.ml_models.retina_detector import LandmarksDetector
+from src.ml_models.retina_video_process import VideoProcess
+
+from src.ml_models.model_module import ModelModule
+
+class VSR(torch.nn.Module):
+    def __init__(self):
+        super(VSR, self).__init__()
+        
+        self.landmarks_detector = LandmarksDetector(device="cuda")
+        self.video_process = VideoProcess(mean_face_path="extra_files/retina_mean.npy", convert_gray=False)
+        self.video_transform = VideoTransform(subset="test")
+        self.modelmodule = ModelModule()
+
+
+    def forward(self, data_filename):
+        data_filename = os.path.abspath(data_filename)
+        cur_time = time.time()
+        video = self.load_video(data_filename)
+        logging.info(f"IP: {time.time() - cur_time:.4f}s")
+        cur_time = time.time()
+        landmarks = self.landmarks_detector(video)
+        logging.info(f"FD: {time.time() - cur_time:.4f}s")
+        cur_time = time.time()
+        video = self.video_process(video, landmarks)
+        logging.info(f"FC: {time.time() - cur_time:.4f}s")
+        if video is None:
+            return ''
+        cur_time = time.time()
+        video = torch.tensor(video)
+        video = video.permute((0, 3, 1, 2))
+        video = self.video_transform(video)
+        logging.info(f"VE: {time.time() - cur_time:.4f}s")
+        cur_time = time.time()
+        with torch.no_grad():
+            transcript = self.modelmodule(video)
+        logging.info(f"VI: {time.time() - cur_time:.4f}s")
+        return transcript
+
+    def load_video(self, data_filename):
+        # cap = cv2.VideoCapture(data_filename)
+        # length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # images = []
+        # success, image = cap.read()
+        # # count = 0
+        # while success:
+        #     # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        #     images.append(image)
+        #     #   cv2.imwrite("frame%d.jpg" % count, image)     # save frame as JPEG file      
+        #     success, image = cap.read()
+        #     # print('Read a new frame: ', success)
+        #     # count += 1
+        # images_np = torch.from_numpy(np.array(images)[:, :, :, ::-1].copy())
+        # return images_np
+
+
+        return torchvision.io.read_video(data_filename, end_pts=10, pts_unit="sec")[0].numpy()
+
+
+# if __name__ == "__main__":
+#     pipeline = VSR()
+#     pipeline.load_state_dict(torch.load('../model_weights/vsr.pth'))
+#     pipeline = pipeline.to('cuda')
+#     pipeline.eval()
+#     transcript = pipeline('../data/one_ten.MOV')
+#     print(f"transcript: {transcript}")
