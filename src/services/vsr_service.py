@@ -273,11 +273,11 @@ class VSRService:
                 result_object_name = f"vsr_{object_name.split('/')[-1]}"
 
                 with self.tracer.start_as_current_span("gcs_download") as download_span:
-                    curl_cmd = f'curl -X GET -H "Authorization: Bearer {token}" -o {result_object_name} ' + \
-                                f'"https://storage.googleapis.com/download/storage/v1/b/{bucket_name}/o/{object_encoded_name}?alt=media"'
+                    curl_cmd = ["curl", "-X", "GET", "-H", f"Authorization: Bearer {token}", "-o", result_object_name,
+                                f"https://storage.googleapis.com/download/storage/v1/b/{bucket_name}/o/{object_encoded_name}?alt=media"]
 
                     start_ts = time.time()
-                    exit_code = os.system(curl_cmd)
+                    exit_code = subprocess.run(curl_cmd).returncode
                     duration = time.time() - start_ts
 
                     if exit_code != 0:
