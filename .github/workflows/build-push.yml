@@ -45,7 +45,10 @@ jobs:
         uses: "google-github-actions/auth@v2"
         with:
           credentials_json: "${{ secrets.GCP_SA_KEY }}"
-          token_format: "access_token"
+          # No access_token requested: the AR push authenticates via the exported
+          # credentials file + the gcloud docker credential helper. Minting an
+          # access token would need serviceAccountTokenCreator on the SA itself
+          # and nothing here consumes it (CodeRabbit).
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
