@@ -8,36 +8,46 @@ import logging
 from src.ml_models.data_transforms import VideoTransform
 from src.ml_models.retina_detector import LandmarksDetector
 from src.ml_models.retina_video_process import VideoProcess
+from src.ml_models.timing import StageTimer
 
 from src.ml_models.model_module import ModelModule
 
 class VSR(torch.nn.Module):
-    def __init__(self):
+    """Full VSR pipeline. Keyword defaults reproduce production behaviour; the eval
+    harness passes overrides (device, skip_step, decoder settings, sync'd timing)."""
+
+    def __init__(self, device="cuda", skip_step=5, sync_timing=False, **decoder_kwargs):
         super(VSR, self).__init__()
-        
-        self.landmarks_detector = LandmarksDetector(device="cuda")
+
+        self.timer = StageTimer(device, sync=sync_timing)
+        self.landmarks_detector = LandmarksDetector(device=device, skip_step=skip_step)
         self.video_process = VideoProcess(mean_face_path="extra_files/retina_mean.npy", convert_gray=False)
         self.video_transform = VideoTransform(subset="test")
-        self.modelmodule = ModelModule()
+        self.modelmodule = ModelModule(device=device, timer=self.timer, **decoder_kwargs)
 
 
     def forward(self, data_filename):
+        self.timer.reset()
         data_filename = os.path.abspath(data_filename)
         cur_time = time.time()
-        video = self.load_video(data_filename)
+        with self.timer.stage('read_video'):
+            video = self.load_video(data_filename)
         logging.info(f"IP: {time.time() - cur_time:.4f}s")
         cur_time = time.time()
-        landmarks = self.landmarks_detector(video)
+        with self.timer.stage('landmarks'):
+            landmarks = self.landmarks_detector(video)
         logging.info(f"FD: {time.time() - cur_time:.4f}s")
         cur_time = time.time()
-        video = self.video_process(video, landmarks)
+        with self.timer.stage('crop'):
+            video = self.video_process(video, landmarks)
         logging.info(f"FC: {time.time() - cur_time:.4f}s")
         if video is None:
             return ''
         cur_time = time.time()
-        video = torch.tensor(video)
-        video = video.permute((0, 3, 1, 2))
-        video = self.video_transform(video)
+        with self.timer.stage('transform'):
+            video = torch.tensor(video)
+            video = video.permute((0, 3, 1, 2))
+            video = self.video_transform(video)
         logging.info(f"VE: {time.time() - cur_time:.4f}s")
         cur_time = time.time()
         with torch.no_grad():

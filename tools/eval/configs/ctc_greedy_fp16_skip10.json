@@ -1,0 +1,6 @@
+{
+ "name": "ctc_greedy_fp16_skip10",
+ "decode_mode": "ctc_greedy",
+ "autocast": "fp16",
+ "skip_step": 10
+}

@@ -1,0 +1,5 @@
+{
+ "name": "beam8_fp16",
+ "beam_size": 8,
+ "autocast": "fp16"
+}

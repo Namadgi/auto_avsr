@@ -1,0 +1,6 @@
+{
+ "name": "ctcw0_beam8_skip10",
+ "ctc_weight": 0.0,
+ "beam_size": 8,
+ "skip_step": 10
+}
