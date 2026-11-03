@@ -48,6 +48,15 @@ class VSRService:
         cpu_workers = max(1, int(os.getenv("VSR_CPU_WORKERS", "2")))
         self._cpu_pool = ThreadPoolExecutor(max_workers=cpu_workers, thread_name_prefix="vsr-cpu")
         self._gpu_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="vsr-gpu")
+        # Admission bound (per uvicorn worker process): caps requests between
+        # "start preprocess" and "workdir removed", so per-request files on disk
+        # never exceed this many per process (x2 with --workers 2). Excess
+        # requests wait before touching disk. Default = fill every pool slot
+        # (cpu_workers preprocessing + 1 inferring).
+        self._max_inflight = max(1, int(os.getenv("VSR_MAX_INFLIGHT", str(cpu_workers + 1))))
+        # Created lazily inside the running loop: on Python 3.8 (the image's
+        # python) asyncio primitives bind to the loop current at construction.
+        self._admission: Optional[asyncio.Semaphore] = None
 
         # Initialize OpenTelemetry
         self._setup_telemetry()
@@ -144,9 +153,18 @@ class VSRService:
 
     async def process_video(self, data: Any) -> ResponseModel:
         """
-        Asynchronously process video with telemetry instrumentation
+        Asynchronously process video with telemetry instrumentation.
+        Admission-bounded: see VSR_MAX_INFLIGHT.
         """
+        if self._admission is None:
+            self._admission = asyncio.Semaphore(self._max_inflight)
+        wait_start = time.time()
+        async with self._admission:
+            return await self._process_video(data, time.time() - wait_start)
+
+    async def _process_video(self, data: Any, admission_wait: float) -> ResponseModel:
         with self.tracer.start_as_current_span("vsr_process_video") as span:
+            span.set_attribute("admission_wait_seconds", admission_wait)
             try:
                 # Set request attributes
                 span.set_attribute("service.name", "vsr_service")
