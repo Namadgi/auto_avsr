@@ -5,7 +5,14 @@ FastAPI service that performs visual speech recognition on uploaded videos or Go
 - GPU-capable host with Docker (recommended) and the NVIDIA runtime installed.
 - If running without Docker: Python 3.8+, CUDA-enabled PyTorch, FFmpeg, and system git/git-lfs.
 
-The model weights used by the service are already committed at `src/model_weights/vsr.pth`.
+The model weights (`src/model_weights/vsr.pth`) are **not** in git. They live in the private bucket `gs://biometry-416410-ml-models/vsr/vsr.pth` (checksum alongside as `vsr.pth.sha256`). CI fetches them before `docker build`; for a local build fetch them first:
+
+```bash
+mkdir -p src/model_weights
+gcloud storage cp gs://biometry-416410-ml-models/vsr/vsr.pth src/model_weights/vsr.pth
+```
+
+Without this file the image builds but crash-loops at startup with `FileNotFoundError`.
 
 ## Quick start (Docker, recommended)
 ```bash
