@@ -22,6 +22,11 @@ on:
 env:
   REGION: us-central1
   IMAGE: us-central1-docker.pkg.dev/biometry-416410/biometry-docker-repo/vsr
+  # vsr.pth is not in git (too large; BM-521). It lives in a dedicated private,
+  # versioned bucket and is fetched into the build context before docker build.
+  # The sha256 pin makes any weights swap an explicit, reviewed commit.
+  VSR_WEIGHTS_URI: gs://biometry-416410-ml-models/vsr/vsr.pth
+  VSR_WEIGHTS_SHA256: 3a69e7779fea1861f2e1becdd146416cf452fd8f442cd1a52a10d9a9bf978445
 
 jobs:
   build-and-push:
@@ -49,6 +54,19 @@ jobs:
           # credentials file + the gcloud docker credential helper. Minting an
           # access token would need serviceAccountTokenCreator on the SA itself
           # and nothing here consumes it (CodeRabbit).
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      # COPY src/ in the Dockerfile bakes src/model_weights/vsr.pth into the image.
+      # Fail the build if the fetch fails or the checksum drifts, so a weightless
+      # image (crash-loops on FileNotFoundError) can never be pushed again.
+      - name: Fetch vsr weights from GCS
+        run: |
+          mkdir -p src/model_weights
+          gcloud storage cp "${{ env.VSR_WEIGHTS_URI }}" src/model_weights/vsr.pth
+          echo "${{ env.VSR_WEIGHTS_SHA256 }}  src/model_weights/vsr.pth" | sha256sum -c -
+          ls -l src/model_weights/
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
