@@ -8,7 +8,9 @@ import numpy as np
 import subprocess
 import torch
 import asyncio
-from typing import Optional, Any, Tuple, List
+import contextvars
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Any, Tuple, List, Callable
 from src.models import GCSRequest, ResponseModel
 from src.ml_models.vsr import VSR
 import re
@@ -38,7 +40,14 @@ class VSRService:
         self.initialized = False
         self.device = None
         self.model = None
-        # self.processing_lock = asyncio.Lock()
+        # BM-522: blocking work (GCS download + ffmpeg, torch inference) runs off
+        # the event loop so lightweight endpoints (/health, /ready) answer
+        # immediately even while a request is mid-inference. Preprocess is CPU/IO
+        # and runs in parallel up to VSR_CPU_WORKERS; the single GPU worker
+        # serializes inference so the model is never entered concurrently.
+        cpu_workers = max(1, int(os.getenv("VSR_CPU_WORKERS", "2")))
+        self._cpu_pool = ThreadPoolExecutor(max_workers=cpu_workers, thread_name_prefix="vsr-cpu")
+        self._gpu_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="vsr-gpu")
 
         # Initialize OpenTelemetry
         self._setup_telemetry()
@@ -125,11 +134,18 @@ class VSRService:
             self.initialized = False
             raise HTTPException(status_code=500, detail="Failed to initialize model")
 
+    @staticmethod
+    async def _run_in(pool: ThreadPoolExecutor, fn: Callable, *args):
+        """Run a blocking call in `pool`, carrying the current contextvars
+        (OTel active span) into the worker thread so child spans stay nested
+        under the request span. Plain run_in_executor does not copy context."""
+        ctx = contextvars.copy_context()
+        return await asyncio.get_running_loop().run_in_executor(pool, ctx.run, fn, *args)
+
     async def process_video(self, data: Any) -> ResponseModel:
         """
         Asynchronously process video with telemetry instrumentation
         """
-        # async with self.processing_lock:
         with self.tracer.start_as_current_span("vsr_process_video") as span:
             try:
                 # Set request attributes
@@ -141,7 +157,9 @@ class VSRService:
                 # Preprocess with telemetry
                 with self.tracer.start_as_current_span("preprocess") as preprocess_span:
                     step_start_time = time.time()
-                    file_path, phrase, preprocess_timings = self.preprocess(data)
+                    file_path, phrase, preprocess_timings = await self._run_in(
+                        self._cpu_pool, self.preprocess, data
+                    )
                     preprocess_duration = time.time() - step_start_time
 
                     # Record preprocess metrics and attributes
@@ -158,7 +176,7 @@ class VSRService:
                 with self.tracer.start_as_current_span("inference") as inference_span:
                     step_start_time = time.time()
                     try:
-                        text = self.inference(file_path)
+                        text = await self._run_in(self._gpu_pool, self.inference, file_path)
                     finally:
                         shutil.rmtree(os.path.dirname(file_path), ignore_errors=True)
                     inference_duration = time.time() - step_start_time
@@ -202,11 +220,15 @@ class VSRService:
                 return response
 
             except Exception as e:
+                # Preserve the real status code (400/404/503/...) raised by the
+                # stages instead of masking everything as 500 (BM-508 parity).
+                status_code = e.status_code if isinstance(e, HTTPException) else 500
+
                 # Record failure metrics
                 overall_duration = time.time() - overall_start_time
                 self.request_duration.record(overall_duration, {
                     "status": "error",
-                    "response_code": 500
+                    "response_code": status_code
                 })
                 self.request_counter.add(1, {"status": "error"})
 
@@ -216,6 +238,8 @@ class VSRService:
                 span.set_attribute("error", True)
                 span.set_attribute("error_message", str(e))
 
+                if isinstance(e, HTTPException):
+                    raise
                 raise HTTPException(status_code=500, detail=str(e))
 
     def preprocess(self, data: Any) -> Tuple[str, str, List[Tuple[str, float]]]:
@@ -227,11 +251,18 @@ class VSRService:
         if data is None:
             raise HTTPException(status_code=400, detail="Input data is required")
 
-        timings: List[Tuple[str, float]] = []
-
         # Per-request scratch dir: fixed filenames collide across the two uvicorn workers
-        # and any concurrent requests.
+        # and any concurrent requests. On success the caller removes it after
+        # inference; on failure remove it here so error paths don't leak dirs.
         workdir = tempfile.mkdtemp(prefix="vsr_req_")
+        try:
+            return self._preprocess_into(data, workdir)
+        except BaseException:
+            shutil.rmtree(workdir, ignore_errors=True)
+            raise
+
+    def _preprocess_into(self, data: Any, workdir: str) -> Tuple[str, str, List[Tuple[str, float]]]:
+        timings: List[Tuple[str, float]] = []
         video_output = os.path.join(workdir, VIDEO_OUTPUT)
 
         if isinstance(data, UploadFile) or hasattr(data, "file"):  # starlette vs fastapi UploadFile
