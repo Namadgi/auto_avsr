@@ -1,8 +1,8 @@
 """BM-522: vsr handler must not block the event loop.
 
 Heavy deps (torch, the VSR model, GCP exporters) are stubbed so these run on a
-plain CPU box: `pip install fastapi httpx pytest opentelemetry-sdk strsimpy
-numpy python-multipart` then `pytest tests/`.
+plain CPU box: `pip install fastapi httpx pytest pytest-asyncio
+opentelemetry-sdk strsimpy numpy python-multipart` then `pytest tests/`.
 """
 import asyncio
 import os
@@ -73,11 +73,13 @@ trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(_spans))
 
 @pytest.fixture(autouse=True)
 def fake_pipeline(monkeypatch, tmp_path):
-    state = {"active": 0, "max_active": 0, "workdirs": []}
+    state = {"active": 0, "max_active": 0, "workdirs": [], "max_live_workdirs": 0}
     lock = threading.Lock()
 
     def preprocess_into(data, workdir):
         state["workdirs"].append(workdir)
+        live = sum(os.path.exists(d) for d in state["workdirs"])
+        state["max_live_workdirs"] = max(state["max_live_workdirs"], live)
         out = os.path.join(workdir, "vsr_output.mp4")
         open(out, "wb").close()
         return out, data.instances[0].phrase, []
@@ -96,6 +98,8 @@ def fake_pipeline(monkeypatch, tmp_path):
     monkeypatch.setattr(SERVICE, "inference", inference)
     monkeypatch.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # word_map.json
     _spans.clear()
+    # Each test runs on a fresh event loop; drop the lazily created semaphore.
+    monkeypatch.setattr(SERVICE, "_admission", None)
     return state
 
 
@@ -127,6 +131,31 @@ async def test_inference_serialized_on_gpu_pool(fake_pipeline):
     assert fake_pipeline["max_active"] == 1
     for d in fake_pipeline["workdirs"]:
         assert not os.path.exists(d), "per-request workdir leaked"
+
+
+@pytest.mark.asyncio
+async def test_admission_bounds_workdirs_on_disk(fake_pipeline):
+    limit = SERVICE._max_inflight
+    n = limit + 3
+    async with _client() as c:
+        rs = await asyncio.gather(*(c.post("/predictions/vsr", json=BODY) for _ in range(n)))
+    assert all(r.status_code == 200 for r in rs)
+    assert len(fake_pipeline["workdirs"]) == n
+    # Without the bound all n preprocess at once and n workdirs coexist.
+    assert fake_pipeline["max_live_workdirs"] <= limit
+
+
+@pytest.mark.asyncio
+async def test_health_responsive_while_admission_full():
+    async with _client() as c:
+        reqs = [asyncio.create_task(c.post("/predictions/vsr", json=BODY))
+                for _ in range(SERVICE._max_inflight + 2)]
+        await asyncio.sleep(0.2)
+        t0 = time.perf_counter()
+        r = await c.get("/health")
+        latency = time.perf_counter() - t0
+        await asyncio.gather(*reqs)
+    assert r.status_code == 200 and latency < 0.3
 
 
 @pytest.mark.asyncio
