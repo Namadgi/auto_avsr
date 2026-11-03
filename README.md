@@ -4,22 +4,22 @@ FastAPI service that performs visual speech recognition on uploaded videos or Go
 ## Prerequisites
 - GPU-capable host with Docker (recommended) and the NVIDIA runtime installed.
 - If running without Docker: Python 3.8+, CUDA-enabled PyTorch, FFmpeg, and system git/git-lfs.
-
-The model weights (`src/model_weights/vsr.pth`) are **not** in git. They live in the private bucket `gs://biometry-416410-ml-models/vsr/vsr.pth` (checksum alongside as `vsr.pth.sha256`). CI fetches them before `docker build`; for a local build fetch them first:
-
-```bash
-mkdir -p src/model_weights
-gcloud storage cp gs://biometry-416410-ml-models/vsr/vsr.pth src/model_weights/vsr.pth
-```
-
-Without this file the image builds but crash-loops at startup with `FileNotFoundError`.
+- Model weights (`src/model_weights/vsr.pth`) are **not** in git. They live in the private bucket `gs://biometry-416410-ml-models/vsr/vsr.pth`; CI fetches them before `docker build`. For a local build you need the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated (`gcloud auth login`) as an account with read access to that bucket. Without the file the image builds but crash-loops at startup with `FileNotFoundError`.
 
 ## Quick start (Docker, recommended)
 ```bash
 git clone https://github.com/Namadgi/auto_avsr.git
 cd auto_avsr
 
-# Optional: provide GCP credentials if you need to access GCS
+# Fetch the model weights into the build context and verify them against the
+# checksum CI pins in .github/workflows/build-push.yml. It must print "OK";
+# on FAILED, do not build.
+mkdir -p src/model_weights
+gcloud storage cp gs://biometry-416410-ml-models/vsr/vsr.pth src/model_weights/vsr.pth
+echo "$(sed -n 's/^ *VSR_WEIGHTS_SHA256: *//p' .github/workflows/build-push.yml)  src/model_weights/vsr.pth" | sha256sum -c -
+
+# Optional: provide GCP credentials for the container (runtime GCS access).
+# This does not authenticate the gcloud fetch above.
 export GOOGLE_APPLICATION_CREDENTIALS_JSON="$(cat gcp.json)"   # or set GCP_SA_KEY / GCP_SA_KEY_B64
 
 docker build -t vsr .
